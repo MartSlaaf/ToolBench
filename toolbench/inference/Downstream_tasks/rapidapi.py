@@ -62,6 +62,7 @@ class rapidapi_wrapper(base_env):
         self.toolbench_key = args.toolbench_key
         self.rapidapi_key = args.rapidapi_key
         self.use_rapidapi_key = args.use_rapidapi_key
+        self.api_customization = args.api_customization
         self.service_url = "http://8.218.239.54:8080/rapidapi"
         self.get_local_api = args.get_local_api
         # self.service_url = "http://localhost:8080/rapidapi"

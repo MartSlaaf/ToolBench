@@ -20,10 +20,9 @@ class Davinci:
 
     def prediction(self, prompt: str, stop: Optional[List[str]] = None) -> str:
         max_try = 10
-        while True and max_try > 0:
+        while True:
             openai.api_key = self.openai_key
             try:
-                
                 response = openai.Completion.create(
                     engine=self.model,
                     prompt=prompt,
@@ -39,7 +38,10 @@ class Davinci:
             except Exception as e:
                 print(e)
                 max_try -= 1
-        return result
+                if max_try < 0:
+                    result = "Exceed max retry times. Please check your davinci api calling."
+                    break
+        return result, response["usage"]
         
     def add_message(self, message):
         self.conversation_history.append(message)
@@ -69,11 +71,8 @@ class Davinci:
         print("end_print"+"*"*50)
 
     def parse(self,functions,process_id,**args):
-        conv = get_conversation_template(self.template)
-        if self.template == "tool-llama":
-            roles = {"human": conv.roles[0], "gpt": conv.roles[1]}
-        elif self.template == "tool-llama-single-round" or self.template == "tool-llama-multi-rounds":
-            roles = {"system": conv.roles[0], "user": conv.roles[1], "function": conv.roles[2], "assistant": conv.roles[3]}
+        conv = get_conversation_template("tool-llama-single-round")
+        roles = {"system": conv.roles[0], "user": conv.roles[1], "function": conv.roles[2], "assistant": conv.roles[3]}
         conversation_history = self.conversation_history
         question = ''
         for message in conversation_history:
@@ -110,13 +109,10 @@ class Davinci:
             elif role == "Function":
                 prompt += f"Observation: {content}\n"
         if functions != []:
-            predictions = self.prediction(prompt)
+            predictions, usage = self.prediction(prompt)
         else:
-            predictions = self.prediction(prompt)
-        decoded_token_len = len(self.tokenizer(predictions))
-        if process_id == 0:
-            print(f"[process({process_id})]total tokens: {decoded_token_len}")
-
+            predictions, usage = self.prediction(prompt)
+        
         # react format prediction
         thought, action, action_input = react_parser(predictions)
         message = {
@@ -127,7 +123,7 @@ class Davinci:
                 "arguments": action_input
             }
         }
-        return message, 0, decoded_token_len
+        return message, 0, usage["total_tokens"]
 
 
 if __name__ == "__main__":

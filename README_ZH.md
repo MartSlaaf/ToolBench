@@ -31,11 +31,14 @@
 
 🔨这个项目(ToolLLM)旨在构建**开源、大规模、高质量**的指令调整 SFT 数据，以促进构建具有通用工具使用能力的强大LLMs。我们的目标是赋予开源 LLMs 掌握成千上万多样的真实世界API能力。我们通过收集高质量的指令调整数据集来实现这一目标。该数据集使用最新的ChatGPT（gpt-3.5-turbo-16k）自动构建，该版本升级了增强的函数调用功能。我们提供数据集、相应的训练和评估脚本，以及在ToolBench上经过微调的强大模型ToolLLaMA。
 
-**💁‍♂️💁💁‍♀️在 [Discord](https://discord.gg/gkHRaDAu) 加入我们!**
+**💁‍♂️💁💁‍♀️在 [Discord](https://discord.gg/QC2HMaDeh) 加入我们!**
 
 *英文[README](README.md)链接.*
 
 ## 最新支持
+- **[2023/8/30]** Data updation, with more than **120,000** solution path annotations and **intact reasoning thoughts**! Please find `data-0830.zip` on [Google Drive](https://drive.google.com/drive/folders/1yBUQ732mPu-KclJnuQELEhtKakdXFc3J).
+数据更新，拥有超过**12万**解路径标注和**完整的推理thoughts**！请在 [Google Drive](https://drive.google.com/drive/folders/1yBUQ732mPu-KclJnuQELEhtKakdXFc3J) 上找到`data-0830.zip`。
+
 - **[2023/8/8]** 告别幻觉！[**ToolLLaMA-2-7b**](https://huggingface.co/ToolBench/ToolLLaMA-2-7b) (从LLaMA-2-7b微调而来)模型已发布，比ChatGPT有着更少的API幻觉现象.
 
 - **[2023/8/4]** 我们提供RapidAPI后端服务，以免您使用自己的RapidAPI私钥去订阅API。填写[表单](https://forms.gle/oCHHc8DQzhGfiT9r6)后，我们会尽快审核并给您发送ToolBench key去请求该后端服务! 
@@ -88,7 +91,7 @@ https://github.com/OpenBMB/ToolBench/assets/25274507/f1151d85-747b-4fac-92ff-6c7
 
 ## 🗒️数据
 
-👐ToolBench仅用于研究和教育目的，不应被视为反映此数据集的创作者、所有者或贡献者的观点或意见。该数据集以 CC BY NC 4.0许可证 进行分发。以下是数据集的统计信息:
+👐ToolBench仅用于研究和教育目的，不应被视为反映此数据集的创作者、所有者或贡献者的观点或意见。该数据集以 Apache License 2.0 许可证 进行分发。以下是数据集的统计信息:
 
 | 工具数量 | API数量 | 实例数量 | 真实API调用数量 | 平均Reasoning步数 |
 |-----------|----------|---------------|---------------|------------------|
@@ -114,12 +117,35 @@ ToolBench包含单工具和多工具场景。多工具场景可以进一步分�
 ### 数据发布
 
  请使用以下链接下载我们的数据集：[Google Drive](https://drive.google.com/drive/folders/1yBUQ732mPu-KclJnuQELEhtKakdXFc3J)或者[清华云盘](https://cloud.tsinghua.edu.cn/f/c9e50625743b40bfbe10/).
-
- - `G1`，`G2`，`G3` 数据分别代表单工具数据，类别内多工具数据和集合内多工具数据。我们在 G1、G2 和 G3 数据内分别划分出训练集、验证集和测试集，并将训练集合并，作为我们的主要实验的训练数据。`toolllama_G123_dfs_train.json` 文件代表合并后的训练集数据。同时我们也给出了基于Atlas的数据可视化结果：[Atlas Explorer](https://atlas.nomic.ai/map/58aca169-c29a-447a-8f01-0d418fc4d341/030ddad7-5305-461c-ba86-27e1ca79d899) for visualization。
- - 与工具环境相关的数据位于 `toolenv` 目录下。
- - 我们从每个测试集中抽样 100 个实例。`test_query_ids` 目录包含每个测试集中测试实例的query id。
- - 用于工具检索的数据也包含在 `retrieval` 目录中。
-
+文件结构如下:
+```
+├── /data/
+│  ├── /instruction/
+│  ├── /answer/
+│  ├── /toolenv/
+│  ├── /retrieval/
+│  ├── /test_query_ids/
+│  ├── /retrieval_test_query_ids/
+│  ├── toolllama_G123_dfs_train.json
+│  └── toolllama_G123_dfs_eval.json
+├── /reproduction_data/
+│  ├── /chatgpt_cot/
+│  ├── /chatgpt_dfs/
+│  ├── ...
+│  └── /toolllama_dfs/
+├── /data_0830/
+│  ├── /answer_0830/
+│  ├── /test_query_ids/
+│  ├── toolllama_G123_dfs_train_0830.json
+│  └── toolllama_G123_dfs_eval_0830.json
+```
+所有实验和demo都需要`data`目录;ToolEval中使用`reproductive_data`来重现我们的实验结果;`data_0830`是更新后的版本数据，有更多的解路径注释和完整的推理thought。以下是`data`目录的一些描述：
+- `instruction` 和 `answer`：指令数据和解决方案路径标注数据。 `G1`、`G2`、`G3`分别指单工具、类内多工具和集合内多工具数据。我们还有一个用于可视化的 [Atlas Explorer](https://atlas.nomic.ai/map/58aca169-c29a-447a-8f01-0d418fc4d341/030ddad7-5305-461c-ba86-27e1ca79d899)。
+- `toolenv`：工具环境相关数据，包含API json、API代码和API示例返回。
+- `retrieval`：用于工具检索的数据包含在此目录中。
+- `test_query_ids`：我们从每个测试集中抽取 100 个实例。该目录包含每个测试集中测试实例的query id。
+- `retrieval_test_query_ids`：该目录包含检索器测试实例的query id。
+- `toolllama_G123_dfs_train.json` 和 `toolllama_G123_dfs_eval.json`：预处理数据，可用于直接训练 toolllama 并复现我们的结果。对于预处理细节，我们将 G1、G2 和 G3 数据分别分为训练、评估和测试部分，合并各数据集的训练数据进行训练。
 
 ## 🤖模型
 我们发布了全参数微调版本[ToolLLaMA-7b](https://huggingface.co/ToolBench/ToolLLaMA-7b)和lora版本[ToolLLaMA-7b-LoRA](https://huggingface.co/ToolBench/ToolLLaMA-7b-LoRA)，都是在发布的数据集上以多任务方式训练的。我们也发布在实验设置下训练的[tool retriever](https://huggingface.co/ToolBench/ToolBench_IR_bert_based_uncased).
@@ -171,10 +197,18 @@ python toolbench/retrieval/train.py \
 ```
 
 ### 训练ToolLLaMA
-我们的训练代码基于[FastChat](https://github.com/lm-sys/FastChat)开发.您可以使用以下命令用两张A100（80G）训练ToolLLaMA-7b, 训练数据是我们已经处理好的[数据](https://drive.google.com/drive/folders/1yBUQ732mPu-KclJnuQELEhtKakdXFc3J):
+- 数据预处理（G1_answer为例子）:
 ```bash
 export PYTHONPATH=./
-torchrun --nproc_per_node=2 --master_port=20001 toolbench/train/train_long_seq.py \
+python preprocess/preprocess_toolllama_data.py \
+    --tool_data_dir data/answer/G1_answer \
+    --method DFS_woFilter_w2 \
+    --output_file data/answer/toolllama_G1_dfs.json
+```
+- 我们的训练代码基于[FastChat](https://github.com/lm-sys/FastChat)开发.您可以使用以下命令用两张A100（80G）以及我们预处理好的数据`data/toolllama_G123_dfs_train.json`或data_0830版本`data_0830/toolllama_G123_dfs_train_0830.json`来训练 ToolLLaMA-7b。对于预处理细节，我们将 G1、G2 和 G3 数据分别分为训练、评估和测试部分，合并各数据集中的训练数据进行训练:
+```bash
+export PYTHONPATH=./
+torchrun --nproc_per_node=2 --master_port=20001 toolbench/train/train_mem.py \
     --model_name_or_path huggyllama/llama-7b  \
     --data_path  data/toolllama_G123_dfs_train.json \
     --eval_data_path  data/toolllama_G123_dfs_eval.json \
@@ -197,6 +231,7 @@ torchrun --nproc_per_node=2 --master_port=20001 toolbench/train/train_long_seq.p
     --fsdp "full_shard auto_wrap" \
     --fsdp_transformer_layer_cls_to_wrap 'LlamaDecoderLayer' \
     --tf32 True \
+    --source_model_max_length 2048 \
     --model_max_length 8192 \
     --gradient_checkpointing True \
     --lazy_preprocess True \
@@ -216,7 +251,7 @@ python preprocess/preprocess_toolllama_data.py \
 训练lora版本:
 ```bash
 export PYTHONPATH=./
-deepspeed --master_port=20001 toolbench/train/train_long_seq_lora.py \
+deepspeed --master_port=20001 toolbench/train/train_lora.py \
     --model_name_or_path huggyllama/llama-7b  \
     --data_path  data/toolllama_G123_dfs_train.json \
     --eval_data_path  data/toolllama_G123_dfs_eval.json \
@@ -236,6 +271,7 @@ deepspeed --master_port=20001 toolbench/train/train_long_seq_lora.py \
     --warmup_ratio 0.04 \
     --lr_scheduler_type "cosine" \
     --logging_steps 1 \
+    --source_model_max_length 2048 \
     --model_max_length 8192 \
     --gradient_checkpointing True \
     --lazy_preprocess True \    
@@ -261,7 +297,7 @@ python toolbench/inference/qa_pipeline.py \
     --observ_compress_method truncate \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo.json \
-    --output_answer_file data/answer/toolllama_dfs \
+    --output_answer_file toolllama_dfs_inference_result \
     --toolbench_key $TOOLBENCH_KEY
 ```
 
@@ -278,7 +314,7 @@ python toolbench/inference/qa_pipeline.py \
     --observ_compress_method truncate \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo.json \
-    --output_answer_file data/answer/toolllama_lora_dfs \
+    --output_answer_file toolllama_lora_dfs_inference_result \
     --toolbench_key $TOOLBENCH_KEY
 ```
 
@@ -298,7 +334,7 @@ python toolbench/inference/qa_pipeline_open_domain.py \
     --observ_compress_method truncate \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo_open_domain.json \
-    --output_answer_file data/answer/toolllama_lora_dfs_open_domain \
+    --output_answer_file toolllama_lora_dfs_open_domain_inference_result \
     --toolbench_key $TOOLBENCH_KEY
 ```
 ### OpenAI模型
@@ -314,7 +350,7 @@ python toolbench/inference/qa_pipeline.py \
     --max_observation_length 1024 \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo.json \
-    --output_answer_file data/answer/chatgpt_dfs \
+    --output_answer_file chatgpt_dfs_inference_result \
     --toolbench_key $TOOLBENCH_KEY
 ```
 
@@ -330,7 +366,7 @@ python toolbench/inference/qa_pipeline.py \
     --max_observation_length 1024 \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo.json \
-    --output_answer_file data/answer/davinci_dfs \
+    --output_answer_file davinci_dfs_inference_result \
     --toolbench_key $TOOLBENCH_KEY
 ```
 
@@ -347,7 +383,7 @@ python toolbench/inference/qa_pipeline.py \
     --max_observation_length 1024 \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo.json \
-    --output_answer_file data/answer/chatgpt_dfs \
+    --output_answer_file chatgpt_dfs_inference_result \
     --rapidapi_key $RAPIDAPI_KEY \
     --use_rapidapi_key
 ```
@@ -417,7 +453,6 @@ def get_hello_world():
 ```
 - 最后，我们可以通过运行以下命令来使用自定义的**hello_world**API进行推理：
 ```bash
-export RAPIDAPI_KEY=""
 export PYTHONPATH=./
 python toolbench/inference/qa_pipeline.py \
     --tool_root_dir data/toolenv/tools/ \
@@ -428,8 +463,7 @@ python toolbench/inference/qa_pipeline.py \
     --method DFS_woFilter_w2 \
     --input_query_file /path/to/your/query/file \
     --output_answer_file /path/to/your/output/file \
-    --rapidapi_key $RAPIDAPI_KEY \
-    --use_rapidapi_key
+    --api_customization
 ```
 *Currently we only support customized API usage under close-domain setting. We plan to support open-domain soon.*
 
@@ -513,8 +547,8 @@ python ./toolbench/tooleval/convert_to_answer_format.py \
     --output ${TEST_MODEL_DATA}_converted
 
 python ./toolbench/tooleval/automatic_eval_sample.py \
-    --output ${REF_MODEL_DATA}_converted \
-    --ref_output ${TEST_MODEL_DATA}_converted \
+    --output ${TEST_MODEL_DATA}_converted \
+    --ref_output ${REF_MODEL_DATA}_converted \
     --method $REF_MODEL_METHOD \
     --use_existed_output
 ```
@@ -564,8 +598,11 @@ We introduce **hallucinate rate**(lower is better) evaluation metric as a comple
 | ToolLLaMA-LoRA              | 43       | 36.4       | 30      | 42       | 45      | 51       | 41.2    |
 | ToolLLaMA-API Retriever              | **51**       | 39       | 44      | 49       | 49      | **55**       | 47.8    |
 | ToolLLaMA-2              | 43       | 42       | 46      | 55       | 46      | 50       | 47.0    |
+| InternLM-7B-DFS              | **59**       | **57**       | **62**      | **57**       | 45      | **52**       | **55.3**    |
+| [InternLM-20B](https://github.com/InternLM/InternLM)              | **62**       | **63**       | **70**      | **56**       | **61**      | **58**       | **61.7**    |
 
 ## TODO
+- [ ] 更新使用更新数据（data-0830 版本）训练的 ToolLLaMA 结果。
 - [ ] ToolLLaMA将达到GPT-4的工具使用能力。
 
 ## 工具学习相关链接

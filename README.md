@@ -46,6 +46,8 @@ run the parallelized training of adapters via
 *Read this in [中文](README_ZH.md).*
 
 ## What's New
+- **[2023/8/30]** Data updation, with more than **120,000** solution path annotations and **intact reasoning thoughts**! Please find `data_0830.zip` on [Google Drive](https://drive.google.com/drive/folders/1yBUQ732mPu-KclJnuQELEhtKakdXFc3J).
+
 - **[2023/8/8]** No more hallucination! [**ToolLLaMA-2-7b**](https://huggingface.co/ToolBench/ToolLLaMA-2-7b) (fine-tuned from LLaMA-2-7b) is released with lower API hallucination than ChatGPT.
 
 - **[2023/8/4]** We provide **RapidAPI backend service** to free you from using your own RapidAPI key and subscribing the APIs. Please fill out our [form](https://forms.gle/oCHHc8DQzhGfiT9r6). We will review it as soon as possible and send you the ToolBench key to get start on it! 
@@ -93,7 +95,7 @@ Here is the *[Old version](https://github.com/OpenBMB/ToolBench/tree/legacy)* of
 
 ## Data
 
-👐ToolBench is intended solely for research and educational purposes and should not be construed as reflecting the opinions or views of the creators, owners, or contributors of this dataset. It is distributed under [CC BY NC 4.0 License](https://creativecommons.org/licenses/by-nc/4.0/). Below is the statistics of the data :
+👐ToolBench is intended solely for research and educational purposes and should not be construed as reflecting the opinions or views of the creators, owners, or contributors of this dataset. It is distributed under Apache License 2.0. Below is the statistics of the data :
 
 | Tool Nums | API Nums | Instance Nums | Real API Call | Reasoning Traces |
 |-----------|----------|---------------|---------------|------------------|
@@ -118,12 +120,37 @@ ToolBench contains both single-tool and multi-tool scenarios. The multi-tool sce
 ### Data Release
 
  Please download our dataset using the following link: [Google Drive](https://drive.google.com/drive/folders/1yBUQ732mPu-KclJnuQELEhtKakdXFc3J) or [Tsinghua Cloud](https://cloud.tsinghua.edu.cn/f/c9e50625743b40bfbe10/).
-- `G1`,`G2`, `G3`data refers to single-tool, intra-category multi-tool and intra-collection multi-tool data respectively. We also have an [Atlas Explorer](https://atlas.nomic.ai/map/58aca169-c29a-447a-8f01-0d418fc4d341/030ddad7-5305-461c-ba86-27e1ca79d899) for visualization.
-- We split the G1, G2 and G3 data into train, eval and test parts respectively and combine the train data for training in our main experiments. `toolllama_G123_dfs_train.json` refers to the combined train data.
-- The tool environment related data is in `toolenv` directory.
-- We sample 100 instances from every test set. The `test_query_ids` directory contains query ids of the test instances in each test set.
-- The data used for tool retrieval is included in the `retrieval` directory.
+The file structure is as follows:
+```
+├── /data/
+│  ├── /instruction/
+│  ├── /answer/
+│  ├── /toolenv/
+│  ├── /retrieval/
+│  ├── /test_query_ids/
+│  ├── /retrieval_test_query_ids/
+│  ├── toolllama_G123_dfs_train.json
+│  └── toolllama_G123_dfs_eval.json
+├── /reproduction_data/
+│  ├── /chatgpt_cot/
+│  ├── /chatgpt_dfs/
+│  ├── ...
+│  └── /toolllama_dfs/
+├── /data_0830/
+│  ├── /answer_0830/
+│  ├── /test_query_ids/
+│  ├── toolllama_G123_dfs_train_0830.json
+│  └── toolllama_G123_dfs_eval_0830.json
+```
+The `data` directory is needed for all the experiments and demo. `reproduction_data` is used in ToolEval to reproduce our experimental results, and `data_0830` is the updated version data, with more solution path annotations and intact reasoning thoughts. Here is some descriptions for the `data` directory:
+- `instruction` and `answer`: The instruction data and solution path annotation data. `G1`,`G2`, `G3` refers to single-tool, intra-category multi-tool and intra-collection multi-tool data respectively. We also have an [Atlas Explorer](https://atlas.nomic.ai/map/58aca169-c29a-447a-8f01-0d418fc4d341/030ddad7-5305-461c-ba86-27e1ca79d899) for visualization.
+- `toolenv`: The tool environment related data, containing API jsons, API codes and API example responses.
+- `retrieval`: The data used for tool retrieval is included in this directory.
+- `test_query_ids`: We sample 100 instances from every test set. This directory contains query ids of the test instances in each test set.
+- `retrieval_test_query_ids`: This directory contains query ids of the test instances for retriever.
+- `toolllama_G123_dfs_train.json` and `toolllama_G123_dfs_eval.json`: Preprocessed data that can be used to train toolllama directly and reproduce our results. For preprocessing details, we split the G1, G2 and G3 data into train, eval and test parts respectively and combine the train data for training in our main experiments.
 
+*Please make sure you have downloaded the necessary data and put the directory (e.g. `data/`) under `ToolBench/`, so that the following bash scripts can navigate to the related data.*
 
 ## 🤖Model
 
@@ -177,10 +204,18 @@ python toolbench/retrieval/train.py \
 ```
 
 ### Training ToolLLaMA
-Our training code is based on [FastChat](https://github.com/lm-sys/FastChat). You can use the following command to train ToolLLaMA-7b with 2 x A100 (80GB), with the preprocessed data in our [data link](https://drive.google.com/drive/folders/1yBUQ732mPu-KclJnuQELEhtKakdXFc3J):
+- Data preprocessing, for G1_answer as an example:
 ```bash
 export PYTHONPATH=./
-torchrun --nproc_per_node=2 --master_port=20001 toolbench/train/train_long_seq.py \
+python preprocess/preprocess_toolllama_data.py \
+    --tool_data_dir data/answer/G1_answer \
+    --method DFS_woFilter_w2 \
+    --output_file data/answer/toolllama_G1_dfs.json
+```
+- Our training code is based on [FastChat](https://github.com/lm-sys/FastChat). You can use the following command to train ToolLLaMA-7b with 2 x A100 (80GB), with our preprocessed data `data/toolllama_G123_dfs_train.json`, or data_0830 version, `data_0830/toolllama_G123_dfs_train_0830.json`. For preprocessing details, we split the G1, G2 and G3 data into train, eval and test parts respectively and combine the train data for training in our main experiments:
+```bash
+export PYTHONPATH=./
+torchrun --nproc_per_node=2 --master_port=20001 toolbench/train/train_mem.py \
     --model_name_or_path huggyllama/llama-7b  \
     --data_path  data/toolllama_G123_dfs_train.json \
     --eval_data_path  data/toolllama_G123_dfs_eval.json \
@@ -203,26 +238,17 @@ torchrun --nproc_per_node=2 --master_port=20001 toolbench/train/train_long_seq.p
     --fsdp "full_shard auto_wrap" \
     --fsdp_transformer_layer_cls_to_wrap 'LlamaDecoderLayer' \
     --tf32 True \
+    --source_model_max_length 2048 \
     --model_max_length 8192 \
     --gradient_checkpointing True \
     --lazy_preprocess True \
     --report_to none
 ```
 
-You can also preprocess and split the data in your own way with this command:
-```bash
-export PYTHONPATH=./
-python preprocess/preprocess_toolllama_data.py \
-    --tool_data_dir data/answer/G1_answer \
-    --method DFS_woFilter_w2 \
-    --output_file data/answer/toolllama_G1_dfs.json
-```
-
-
 To train lora version:
 ```bash
 export PYTHONPATH=./
-deepspeed --master_port=20001 toolbench/train/train_long_seq_lora.py \
+deepspeed --master_port=20001 toolbench/train/train_lora.py \
     --model_name_or_path huggyllama/llama-7b  \
     --data_path  data/toolllama_G123_dfs_train.json \
     --eval_data_path  data/toolllama_G123_dfs_eval.json \
@@ -242,6 +268,7 @@ deepspeed --master_port=20001 toolbench/train/train_long_seq_lora.py \
     --warmup_ratio 0.04 \
     --lr_scheduler_type "cosine" \
     --logging_steps 1 \
+    --source_model_max_length 2048 \
     --model_max_length 8192 \
     --gradient_checkpointing True \
     --lazy_preprocess True \    
@@ -269,7 +296,7 @@ python toolbench/inference/qa_pipeline.py \
     --observ_compress_method truncate \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo.json \
-    --output_answer_file data/answer/toolllama_dfs \
+    --output_answer_file toolllama_dfs_inference_result \
     --toolbench_key $TOOLBENCH_KEY
 ```
 
@@ -286,7 +313,7 @@ python toolbench/inference/qa_pipeline.py \
     --observ_compress_method truncate \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo.json \
-    --output_answer_file data/answer/toolllama_lora_dfs \
+    --output_answer_file toolllama_lora_dfs_inference_result \
     --toolbench_key $TOOLBENCH_KEY
 ```
 
@@ -306,7 +333,7 @@ python toolbench/inference/qa_pipeline_open_domain.py \
     --observ_compress_method truncate \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo_open_domain.json \
-    --output_answer_file data/answer/toolllama_lora_dfs_open_domain \
+    --output_answer_file toolllama_lora_dfs_open_domain_inference_result \
     --toolbench_key $TOOLBENCH_KEY
 ```
 
@@ -323,7 +350,7 @@ python toolbench/inference/qa_pipeline.py \
     --max_observation_length 1024 \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo.json \
-    --output_answer_file data/answer/chatgpt_dfs \
+    --output_answer_file chatgpt_dfs_inference_result \
     --toolbench_key $TOOLBENCH_KEY
 ```
 
@@ -339,7 +366,7 @@ python toolbench/inference/qa_pipeline.py \
     --max_observation_length 1024 \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo.json \
-    --output_answer_file data/answer/davinci_dfs \
+    --output_answer_file davinci_dfs_inference_result \
     --toolbench_key $TOOLBENCH_KEY
 ```
 
@@ -356,7 +383,7 @@ python toolbench/inference/qa_pipeline.py \
     --max_observation_length 1024 \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo.json \
-    --output_answer_file data/answer/chatgpt_dfs \
+    --output_answer_file chatgpt_dfs_inference_result \
     --rapidapi_key $RAPIDAPI_KEY \
     --use_rapidapi_key
 ```
@@ -425,7 +452,6 @@ Now the file structure under `data/toolenv/` should be:
 ```
 - Finally we are free to inference with the **hello_world** API by running the following commands:
 ```bash
-export RAPIDAPI_KEY=""
 export PYTHONPATH=./
 python toolbench/inference/qa_pipeline.py \
     --tool_root_dir data/toolenv/tools/ \
@@ -436,8 +462,7 @@ python toolbench/inference/qa_pipeline.py \
     --method DFS_woFilter_w2 \
     --input_query_file /path/to/your/query/file \
     --output_answer_file /path/to/your/output/file \
-    --rapidapi_key $RAPIDAPI_KEY \
-    --use_rapidapi_key
+    --api_customization
 ```
 *Currently we only support customized API usage under close-domain setting. We plan to support open-domain soon.*
 
@@ -471,7 +496,7 @@ python toolbench/inference/toolbench_server.py \
     --max_observation_length 1024 \
     --method DFS_woFilter_w2 \
     --input_query_file data/instruction/inference_query_demo_open_domain.json \
-    --output_answer_file data/answer/toolllama_lora_dfs_open_domain \
+    --output_answer_file toolllama_lora_dfs_open_domain_result \
     --rapidapi_key $RAPIDAPIKEY
 ```
 
@@ -500,14 +525,14 @@ More details about ToolEval can be found in our paper.
 To evaluate a model on G1-Inst. test set, for example, run the following commands.
 - Pass rate:
 ```bash
-python toolbench/tooleval/pass_rate.py --answer_dir data/answer/toolllama_dfs/G1_instruction
+python toolbench/tooleval/pass_rate.py --answer_dir reproduction_data/toolllama_dfs/G1_instruction
 ```
 - Win rate (Reference model: ChatGPT-ReACT):
 ```bash
 export OPENAI_KEY=""
-export REF_MODEL_DATA="data/answer/chatgpt_cot/G1_instruction"
+export REF_MODEL_DATA="reproduction_data/chatgpt_cot/G1_instruction"
 export REF_MODEL_METHOD="CoT"
-export TEST_MODEL_DATA="data/answer/toolllama_dfs/G1_instruction"
+export TEST_MODEL_DATA="reproduction_data/toolllama_dfs/G1_instruction"
 export TEST_MODEL_METHOD="DFS"
 python ./toolbench/tooleval/convert_to_answer_format.py \
     --method CoT \
@@ -520,8 +545,8 @@ python ./toolbench/tooleval/convert_to_answer_format.py \
     --output ${TEST_MODEL_DATA}_converted
 
 python ./toolbench/tooleval/automatic_eval_sample.py \
-    --output ${REF_MODEL_DATA}_converted \
-    --ref_output ${TEST_MODEL_DATA}_converted \
+    --output ${TEST_MODEL_DATA}_converted \
+    --ref_output ${REF_MODEL_DATA}_converted \
     --method $REF_MODEL_METHOD \
     --use_existed_output
 ```
@@ -570,9 +595,12 @@ Below are the main results compared with ChatGPT and Text-Davinci-003.
 | ToolLLaMA-LoRA              | 43       | 36.4       | 30      | 42       | 45      | 51       | 41.2    |
 | ToolLLaMA-API Retriever              | **51**       | 39       | 44      | 49       | 49      | **55**       | 47.8    |
 | ToolLLaMA-2              | 43       | 42       | 46      | 55       | 46      | 50       | 47.0    |
+| InternLM-7B-DFS              | **59**       | **57**       | **62**      | **57**       | 45      | **52**       | **55.3**    |
+| [InternLM-20B](https://github.com/InternLM/InternLM)              | **62**       | **63**       | **70**      | **56**       | **61**      | **58**       | **61.7**    |
 
 
 ## TODO
+- [ ] Update ToolLLaMA results trained with updated data (data_0830 version).
 - [ ] ToolLLaMA will reach GPT-4's tool-use capability.
 
 ## Resources of Tool Learning
