@@ -1,3 +1,10 @@
+
+from toolbench.train.llama_flash_attn_monkey_patch import (
+    replace_llama_attn_with_flash_attn,
+)
+
+replace_llama_attn_with_flash_attn()
+
 #!/usr/bin/env python
 # coding=utf-8
 import time
@@ -9,27 +16,54 @@ import torch
 from transformers import (
     AutoTokenizer,
     AutoModelForCausalLM,
+    BitsAndBytesConfig
 )
 from toolbench.utils import process_system_message
 from toolbench.model.model_adapter import get_conversation_template
 from toolbench.inference.utils import SimpleChatIO, generate_stream, react_parser
 
+import outlines.models as models
+
+from peft import PeftModel
+
+
 
 class ToolLLaMA:
-    def __init__(self, model_name_or_path: str, template:str="tool-llama-single-round", device: str="cuda", cpu_offloading: bool=False) -> None:
+    def __init__(self, model_name_or_path: str, lora_name_or_path:str=None, template:str="tool-llama-single-round", device: str="cuda", cpu_offloading: bool=False) -> None:
         super().__init__()
         self.model_name = model_name_or_path
         self.template = template
         self.tokenizer = AutoTokenizer.from_pretrained(model_name_or_path, use_fast=False, model_max_length=8192)
-        self.model = AutoModelForCausalLM.from_pretrained(
-            model_name_or_path, low_cpu_mem_usage=True
-        )
+        # self.model = AutoModelForCausalLM.from_pretrained(
+        #     model_name_or_path, low_cpu_mem_usage=True, device_map='auto',
+        # )
+
+        if lora_name_or_path is not None:
+            bnb_config = BitsAndBytesConfig(
+                                        load_in_4bit=True,
+                                        bnb_4bit_use_double_quant=True,
+                                        bnb_4bit_quant_type="nf4",
+                                        bnb_4bit_compute_dtype=torch.float16
+                                    )
+            model = AutoModelForCausalLM.from_pretrained(
+                model_name_or_path,
+                trust_remote_code=True,
+                quantization_config=bnb_config,
+                device_map={'': 0}
+            )
+            model = PeftModel.from_pretrained(model, lora_name_or_path)
+            self.model = model.eval()
+            self.model2 = None
+        else:
+            self.model2 = models.transformers(model_name_or_path, device_map='auto')
+            self.model = self.model2.model
+        # self.model2 = None
         if self.tokenizer.pad_token_id == None:
             self.tokenizer.add_special_tokens({"bos_token": "<s>", "eos_token": "</s>", "pad_token": "<pad>"})
             self.model.resize_token_embeddings(len(self.tokenizer))
         self.use_gpu = (True if device == "cuda" else False)
-        if (device == "cuda" and not cpu_offloading) or device == "mps":
-            self.model.to(device)
+        # if (device == "cuda" and not cpu_offloading) or device == "mps":
+        #     self.model.to(device)
         self.chatio = SimpleChatIO()
 
     def prediction(self, prompt: str, stop: Optional[List[str]] = None) -> str:
@@ -44,7 +78,7 @@ class ToolLLaMA:
                 "echo": False
             }
             generate_stream_func = generate_stream
-            output_stream = generate_stream_func(self.model, self.tokenizer, gen_params, "cuda", 8192, force_generate=True)
+            output_stream = generate_stream_func(self.model, self.model2, self.tokenizer, gen_params, "cuda", 8192, force_generate=True)
             outputs = self.chatio.return_output(output_stream)
             prediction = outputs.strip()
         return prediction

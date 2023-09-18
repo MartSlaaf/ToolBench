@@ -19,6 +19,7 @@ from toolbench.utils import (
     change_name,
     replace_llama_with_condense
 )
+from data import local_api
 
 from toolbench.inference.Downstream_tasks.base_env import base_env
 
@@ -62,6 +63,8 @@ class rapidapi_wrapper(base_env):
         self.rapidapi_key = args.rapidapi_key
         self.use_rapidapi_key = args.use_rapidapi_key
         self.service_url = "http://8.218.239.54:8080/rapidapi"
+        self.get_local_api = args.get_local_api
+        # self.service_url = "http://localhost:8080/rapidapi"
         self.max_observation_length = args.max_observation_length
         self.observ_compress_method = args.observ_compress_method
         self.retriever = retriever
@@ -342,10 +345,19 @@ You have access of the following tools:\n'''
                     }
                     if self.process_id == 0:
                         print(colored(f"query to {self.cate_names[k]}-->{self.tool_names[k]}-->{action_name}",color="yellow"))
+                    response = None
                     if self.use_rapidapi_key:
                         payload["rapidapi_key"] = self.rapidapi_key
                         response = get_rapidapi_response(payload)
-                    else:
+                    elif self.get_local_api:
+                        try:
+                            resp = getattr(local_api, pure_api_name)(**json.loads(action_input))
+                            err = 'none'
+                        except Exception as e:
+                            err = str(e)
+                            resp = 'none'
+                        response = {'error': err, 'response': resp}
+                    if response is None:
                         time.sleep(2) # rate limit: 30 per minute
                         headers = {"toolbench_key": self.toolbench_key}
                         response = requests.post(self.service_url, json=payload, headers=headers, timeout=15)
@@ -403,7 +415,7 @@ class pipeline_runner:
             # ratio = 4 means the sequence length is expanded by 4, remember to change the model_max_length to 8192 (2048 * ratio) for ratio = 4
             replace_llama_with_condense(ratio=4)
             if args.lora:
-                backbone_model = ToolLLaMALoRA(base_name_or_path=args.model_path, model_name_or_path=args.lora_path)
+                backbone_model = ToolLLaMA(model_name_or_path=args.model_path, lora_name_or_path=args.lora_path) #ToolLLaMALoRA(base_name_or_path=args.model_path, model_name_or_path=args.lora_path)
             else:
                 backbone_model = ToolLLaMA(model_name_or_path=args.model_path)
         else:

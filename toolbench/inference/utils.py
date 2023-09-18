@@ -11,6 +11,7 @@ from transformers.generation.logits_process import (
     TopKLogitsWarper,
     TopPLogitsWarper,
 )
+import re
 
 # For DFS
 def softmax_bias(answers,temperature=1):
@@ -55,7 +56,7 @@ def prepare_logits_processor(
 
 @torch.inference_mode()
 def generate_stream(
-    model, tokenizer, params, device, context_len=8192, stream_interval=2, force_generate=False
+    model, model2, tokenizer, params, device, context_len=8192, stream_interval=2, force_generate=False
 ):
     prompt = params["prompt"]
     len_prompt = len(prompt)
@@ -95,106 +96,125 @@ def generate_stream(
         )
 
     past_key_values = out = None
-    for i in range(max_new_tokens):
-        if i == 0:
-            if model.config.is_encoder_decoder:
-                out = model.decoder(
-                    input_ids=start_ids,
-                    encoder_hidden_states=encoder_output,
-                    use_cache=True,
-                )
-                logits = model.lm_head(out[0])
-            else:
-                out = model(torch.as_tensor([input_ids], device=device), use_cache=True)
-                logits = out.logits
-            past_key_values = out.past_key_values
-        else:
-            if model.config.is_encoder_decoder:
-                out = model.decoder(
-                    input_ids=torch.as_tensor([[token]], device=device),
-                    encoder_hidden_states=encoder_output,
-                    use_cache=True,
-                    past_key_values=past_key_values,
-                )
+    # for i in range(max_new_tokens):
+    #     if i == 0:
+    #         if model.config.is_encoder_decoder:
+    #             out = model.decoder(
+    #                 input_ids=start_ids,
+    #                 encoder_hidden_states=encoder_output,
+    #                 use_cache=True,
+    #             )
+    #             logits = model.lm_head(out[0])
+    #         else:
+    #             out = model(torch.as_tensor([input_ids], device=device), use_cache=True)
+    #             logits = out.logits
+    #         past_key_values = out.past_key_values
+    #     else:
+    #         if model.config.is_encoder_decoder:
+    #             out = model.decoder(
+    #                 input_ids=torch.as_tensor([[token]], device=device),
+    #                 encoder_hidden_states=encoder_output,
+    #                 use_cache=True,
+    #                 past_key_values=past_key_values,
+    #             )
 
-                logits = model.lm_head(out[0])
-            else:
-                out = model(
-                    input_ids=torch.as_tensor([[token]], device=device),
-                    use_cache=True,
-                    past_key_values=past_key_values,
-                )
-                logits = out.logits
-            past_key_values = out.past_key_values
+    #             logits = model.lm_head(out[0])
+    #         else:
+    #             out = model(
+    #                 input_ids=torch.as_tensor([[token]], device=device),
+    #                 use_cache=True,
+    #                 past_key_values=past_key_values,
+    #             )
+    #             logits = out.logits
+    #         past_key_values = out.past_key_values
 
-        if logits_processor:
-            if repetition_penalty > 1.0:
-                tmp_output_ids = torch.as_tensor([output_ids], device=logits.device)
-            else:
-                tmp_output_ids = None
-            last_token_logits = logits_processor(tmp_output_ids, logits[:, -1, :])[0]
-        else:
-            last_token_logits = logits[0, -1, :]
+    #     if logits_processor:
+    #         if repetition_penalty > 1.0:
+    #             tmp_output_ids = torch.as_tensor([output_ids], device=logits.device)
+    #         else:
+    #             tmp_output_ids = None
+    #         last_token_logits = logits_processor(tmp_output_ids, logits[:, -1, :])[0]
+    #     else:
+    #         last_token_logits = logits[0, -1, :]
 
-        if device == "mps":
-            # Switch to CPU by avoiding some bugs in mps backend.
-            last_token_logits = last_token_logits.float().to("cpu")
+    #     if device == "mps":
+    #         # Switch to CPU by avoiding some bugs in mps backend.
+    #         last_token_logits = last_token_logits.float().to("cpu")
 
-        if temperature < 1e-5 or top_p < 1e-8:  # greedy
-            token = int(torch.argmax(last_token_logits))
-        else:
-            probs = torch.softmax(last_token_logits, dim=-1)
-            token = int(torch.multinomial(probs, num_samples=1))
+    #     if temperature < 1e-5 or top_p < 1e-8:  # greedy
+    #         token = int(torch.argmax(last_token_logits))
+    #     else:
+    #         probs = torch.softmax(last_token_logits, dim=-1)
+    #         token = int(torch.multinomial(probs, num_samples=1))
 
-        output_ids.append(token)
+    #     output_ids.append(token)
 
-        if token in stop_token_ids:
-            stopped = True
-        else:
-            stopped = False
-        if i == 0 and force_generate:
-            stopped = False
-        if i == max_new_tokens - 1 or stopped:
-            if echo:
-                tmp_output_ids = output_ids
-                rfind_start = len_prompt
-            else:
-                tmp_output_ids = output_ids[input_echo_len:]
-                rfind_start = 0
+    #     if token in stop_token_ids:
+    #         stopped = True
+    #     else:
+    #         stopped = False
+    #     if i == 0 and force_generate:
+    #         stopped = False
+    #     if i == max_new_tokens - 1 or stopped:
+    #         if echo:
+    #             tmp_output_ids = output_ids
+    #             rfind_start = len_prompt
+    #         else:
+    #             tmp_output_ids = output_ids[input_echo_len:]
+    #             rfind_start = 0
 
-            output = tokenizer.decode(
-                tmp_output_ids,
-                skip_special_tokens=True,
-                spaces_between_special_tokens=False,
-            )
-            if stop_str:
-                if isinstance(stop_str, str):
-                    pos = output.rfind(stop_str, rfind_start)
-                    if pos != -1:
-                        output = output[:pos]
-                        stopped = True
-                elif isinstance(stop_str, Iterable):
-                    for each_stop in stop_str:
-                        pos = output.rfind(each_stop, rfind_start)
-                        if pos != -1:
-                            output = output[:pos]
-                            stopped = True
-                            break
-                else:
-                    raise ValueError("Invalid stop field type.")
+    #         output = tokenizer.decode(
+    #             tmp_output_ids,
+    #             skip_special_tokens=True,
+    #             spaces_between_special_tokens=False,
+    #         )
+    #         if stop_str:
+    #             if isinstance(stop_str, str):
+    #                 pos = output.rfind(stop_str, rfind_start)
+    #                 if pos != -1:
+    #                     output = output[:pos]
+    #                     stopped = True
+    #             elif isinstance(stop_str, Iterable):
+    #                 for each_stop in stop_str:
+    #                     pos = output.rfind(each_stop, rfind_start)
+    #                     if pos != -1:
+    #                         output = output[:pos]
+    #                         stopped = True
+    #                         break
+    #             else:
+    #                 raise ValueError("Invalid stop field type.")
 
-            yield {
-                "text": output,
-                "usage": {
-                    "prompt_tokens": input_echo_len,
-                    "completion_tokens": i,
-                    "total_tokens": input_echo_len + i,
-                },
-                "finish_reason": None,
-            }
+    #         yield {
+    #             "text": output,
+    #             "usage": {
+    #                 "prompt_tokens": input_echo_len,
+    #                 "completion_tokens": i,
+    #                 "total_tokens": input_echo_len + i,
+    #             },
+    #             "finish_reason": None,
+    #         }
 
-        if stopped:
-            break
+    #     if stopped:
+    #         break
+    
+    import outlines.text.generate as generate
+
+    output2 = model.generate(inputs=torch.as_tensor([input_ids], device=device), num_beams=1, do_sample=True, max_new_tokens=max_new_tokens, pad_token_id=stop_token_ids[0], use_cache=False)
+    output2 = output2[0][len(input_ids):]
+    i = len(output2)
+    if output2[-1] == stop_token_ids[0]:
+        output2 = output2[:-1]
+        stopped = True
+    else:
+        stopped = False
+    output = tokenizer.decode(output2).strip()
+
+    # c3 = generate.regex(model2, r'Thought: \nAction: (ls_for_bash|Finish)\nAction Input: \{\n  "(addr|)": "(.+)\/([^\/]+)"\n\}', max_tokens=max_new_tokens)
+    # output = c3(prompt)
+    # output = re.sub(' +', ' ', output)
+    # breakpoint()
+    i = len(tokenizer.tokenize(output))
+    stopped = True
 
     # finish stream event, which contains finish reason
     if i == max_new_tokens - 1:

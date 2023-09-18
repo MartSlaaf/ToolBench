@@ -23,6 +23,7 @@ if __name__ == "__main__":
     parser.add_argument('--toolbench_key', type=str, default="",required=False, help='your toolbench key to request rapidapi service')
     parser.add_argument('--rapidapi_key', type=str, default="",required=False, help='your rapidapi key to request rapidapi service')
     parser.add_argument('--use_rapidapi_key', action="store_true", help="To use customized rapidapi service or not.")
+    parser.add_argument('--get_local_api', action="store_true", help="To use local APIs.")
     
     args = parser.parse_args()
 

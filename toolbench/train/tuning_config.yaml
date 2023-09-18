@@ -1,0 +1,25 @@
+data_args:
+  data_path: data/toolllama_G123_dfs_train.json
+  eval_data_path: data/toolllama_G123_dfs_eval.json
+  lazy_preprocess: true
+  conv_template: tool-llama-single-round
+model:
+  model_name: codellama/CodeLlama-7b-Instruct-hf
+  model_max_length: 7168
+lora_args:
+  lora_r: 128
+  lora_alpha: 256
+  lora_dropout: 0.05
+  lora_target_modules: ["q_proj", "v_proj"]
+  lora_weight_path: ""
+  lora_bias: "none"
+training:
+  save_location: toolcodellama_lora_constant_ww
+  num_train_epochs: 5
+  per_device_train_batch_size: 1
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 10
+  weight_decay: 0.
+  warmup_ratio: 0.04
+  lr_scheduler_type: 'constant_with_warmup'
+  resume_from_checkpoint: false

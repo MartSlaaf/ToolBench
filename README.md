@@ -31,6 +31,16 @@
 
 🔨This project (ToolLLM) aims to construct **open-source, large-scale, high-quality** instruction tuning SFT data to facilitate the construction of powerful LLMs with general **tool-use** capability. We aim to empower open-source LLMs to master thousands of diverse real-world APIs. We achieve this by collecting a high-quality instruction-tuning dataset. It is constructed automatically using the latest ChatGPT (gpt-3.5-turbo-16k), which is upgraded with enhanced [function call](https://openai.com/blog/function-calling-and-other-api-updates) capabilities. We provide the dataset, the corresponding training and evaluation scripts, and a capable model ToolLLaMA fine-tuned on ToolBench.
 
+
+# What's modified in this fork
+
+local APIs will be added soon
+
+run the parallelized training of adapters via
+```export PYTHONPATH=./; CUDA_VISIBLE_DEVICES=2,3,4,5,6,7 accelerate launch --num_processes 6 --mixed_precision="fp16" toolbench/train/acc_lora_run.py```
+
+
+
 **💁‍♂️💁💁‍♀️ Join Us on [Discord](https://discord.gg/gkHRaDAu)!**
 
 *Read this in [中文](README_ZH.md).*
