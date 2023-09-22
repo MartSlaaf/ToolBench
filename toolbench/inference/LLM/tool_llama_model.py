@@ -22,7 +22,7 @@ from toolbench.utils import process_system_message
 from toolbench.model.model_adapter import get_conversation_template
 from toolbench.inference.utils import SimpleChatIO, generate_stream, react_parser
 
-import outlines.models as models
+from outlines.models import transformers as outformer
 
 from peft import PeftModel
 
@@ -53,10 +53,17 @@ class ToolLLaMA:
             )
             model = PeftModel.from_pretrained(model, lora_name_or_path)
             self.model = model.eval()
-            self.model2 = None
         else:
-            self.model2 = models.transformers(model_name_or_path, device_map='auto')
-            self.model = self.model2.model
+            self.model = AutoModelForCausalLM.from_pretrained(
+                model_name_or_path,
+                trust_remote_code=True,
+                load_in_8bit=True,
+                device_map={'': 0}
+            )
+        self.model.config.use_cache = False
+        self.model2 = outformer(model_or_name=self.model, tokenizer_or_name=self.tokenizer)
+            # self.model2 = models.transformers(model_name_or_path, device_map='auto')
+            # self.model = self.model2.model
         # self.model2 = None
         if self.tokenizer.pad_token_id == None:
             self.tokenizer.add_special_tokens({"bos_token": "<s>", "eos_token": "</s>", "pad_token": "<pad>"})

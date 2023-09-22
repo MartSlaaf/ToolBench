@@ -199,19 +199,20 @@ def generate_stream(
     
     import outlines.text.generate as generate
 
-    output2 = model.generate(inputs=torch.as_tensor([input_ids], device=device), num_beams=1, do_sample=True, max_new_tokens=max_new_tokens, pad_token_id=stop_token_ids[0], use_cache=False)
-    output2 = output2[0][len(input_ids):]
-    i = len(output2)
-    if output2[-1] == stop_token_ids[0]:
-        output2 = output2[:-1]
-        stopped = True
-    else:
-        stopped = False
-    output = tokenizer.decode(output2).strip()
+    # output2 = model.generate(inputs=torch.as_tensor([input_ids], device=device), num_beams=1, do_sample=True, max_new_tokens=max_new_tokens, pad_token_id=stop_token_ids[0], use_cache=False)
+    # output2 = output2[0][len(input_ids):]
+    # i = len(output2)
+    # if output2[-1] == stop_token_ids[0]:
+    #     output2 = output2[:-1]
+    #     stopped = True
+    # else:
+    #     stopped = False
+    # output = tokenizer.decode(output2).strip()
 
-    # c3 = generate.regex(model2, r'Thought: \nAction: (ls_for_bash|Finish)\nAction Input: \{\n  "(addr|)": "(.+)\/([^\/]+)"\n\}', max_tokens=max_new_tokens)
-    # output = c3(prompt)
-    # output = re.sub(' +', ' ', output)
+    c3 = generate.regex(model2, r'Thought: \nAction: (ls_for_bash|Finish)\nAction Input: \{\n  "(addr|)": "(.+)\/([^\/]+)"\n\}', max_tokens=max_new_tokens)
+    # breakpoint()
+    output = c3(prompt)
+    output = re.sub(' +', ' ', output)
     # breakpoint()
     i = len(tokenizer.tokenize(output))
     stopped = True
