@@ -73,7 +73,7 @@ class ToolLLaMA:
         #     self.model.to(device)
         self.chatio = SimpleChatIO()
 
-    def prediction(self, prompt: str, stop: Optional[List[str]] = None) -> str:
+    def prediction(self, prompt: str, stop: Optional[List[str]] = None, regexps=None) -> str:
         with torch.no_grad():
             gen_params = {
                 "model": "",
@@ -85,7 +85,7 @@ class ToolLLaMA:
                 "echo": False
             }
             generate_stream_func = generate_stream
-            output_stream = generate_stream_func(self.model, self.model2, self.tokenizer, gen_params, "cuda", 8192, force_generate=True)
+            output_stream = generate_stream_func(self.model, self.model2, self.tokenizer, gen_params, "cuda", 8192, force_generate=True, regexps=regexps)
             outputs = self.chatio.return_output(output_stream)
             prediction = outputs.strip()
         return prediction
@@ -126,7 +126,7 @@ class ToolLLaMA:
 
         self.time = time.time()
         conversation_history = self.conversation_history
-        prompt = ''
+        prompt = '<s>'
         for message in conversation_history:
             role = roles[message['role']]
             content = message['content']
@@ -136,9 +136,9 @@ class ToolLLaMA:
         prompt += "Assistant:\n"
         
         if functions != []:
-            predictions = self.prediction(prompt)
+            predictions = self.prediction(prompt, regexps=args['regexps'] or None)
         else:
-            predictions = self.prediction(prompt)
+            predictions = self.prediction(prompt, regexps=args['regexps'] or None)
 
         decoded_token_len = len(self.tokenizer(predictions))
         if process_id == 0:

@@ -51,6 +51,24 @@ def contain(candidate_list, white_list):
         output.append(white_list[cand])
     return output
 
+finish_func = {
+            "name": "Finish",
+            "description": "If you believe that you have obtained a result that can answer the task, please call this function to provide the final answer. Alternatively, if you recognize that you are unable to proceed with the task in the current state, call this function to restart. Remember: you must ALWAYS call this function at the end of your attempt, and the only part that will be shown to the user is the final answer, so it should contain sufficient information.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "return_type": {
+                        "type": "string",
+                        "enum": ["give_answer","give_up_and_restart"],
+                    },
+                    "final_answer": {
+                        "type": "string",
+                        "description": "The final answer you want to give the user. You should have this field if \"return_type\"==\"give_answer\"",
+                    }
+                },
+                "required": ["return_type"],
+            }
+        }
 
 
 # rapidapi env wrapper
@@ -118,6 +136,7 @@ class rapidapi_wrapper(base_env):
         self.task_description = f'''You should use functions to help handle the real time user querys. Remember:
 1.ALWAYS call \"Finish\" function at the end of the task. And the final answer should contain enough information to show to the user,If you can't handle the task, or you find that function calls always fail(the function is not valid now), use function Finish->give_up_and_restart.
 2.Do not use origin tool names, use only subfunctions' names.
+3.Never write commentaries. Strictly follow the given format, any function with commentaries will fail the task.
 You have access of the following tools:\n'''
         
         unduplicated_reflection = {}
@@ -400,6 +419,141 @@ You have access of the following tools:\n'''
                     #     return json.dumps({"error": f"Timeout error...{e}", "response": ""}), 5
             return json.dumps({"error": f"No such function name: {action_name}", "response": ""}), 1
 
+unversal_regexp_string = r'[^"\{\}]*?'
+
+import requests
+import json
+
+class ApiInterface(base_env): # not sure what it inherits actually
+    def __init__(self, base_url, query_json, args):
+        """
+        Initializes the ApiInterface with the base URL of the API server.
+        In our case the server is an IDE instance.
+
+        Parameters:
+        base_url (str): The base URL of the API server.
+        """
+        self.base_url = base_url
+        # From here on the lines are copied from the rapidapi_wrapper
+        self.task_description = f'''You should use functions to help handle the real time user querys. Remember:
+1.ALWAYS call \"Finish\" function at the end of the task. And the final answer should contain enough information to show to the user,If you can't handle the task, or you find that function calls always fail(the function is not valid now), use function Finish->give_up_and_restart.
+2.Do not use origin tool names, use only subfunctions' names.
+3.Never write commentaries. Strictly follow the given format, any function with commentaries will fail the task.
+You have access of the following tools:\n'''
+        self.input_description = query_json["query"]
+        self.max_observation_length = args.max_observation_length
+        self.success = 0
+
+    @property
+    def functions(self):
+        """
+        Requests a list of available methods from the server and returns it in a specialized JSON format.
+
+        Returns:
+        dict: A dictionary containing the list of available methods in a specialized JSON format.
+        """
+        response = requests.get(f"{self.base_url}/ide-api-list")
+        if response.status_code == 200:
+            methods = response.json()
+            methods = json.loads(methods['serverAnswer'])['APIs']
+
+            methods.append(finish_func)
+                
+            return {"tool_description": "Remotely executed APIs of an IDE.",
+                    "tool_name": "ide",
+                    "title": "ide",
+                    "api_list": methods}
+        else:
+            response.raise_for_status()
+    
+    @property
+    def regexps(self):
+        methods = self.functions['api_list']
+
+        regexp = r'Thought: \nAction: ('
+        for method in methods:
+            regexp += rf'{method["name"]}\nAction Input: '
+            regexp += r'\{\n '
+            if 'parameters' in method.keys(): # old format
+                for parameter_name, parameter_description in method['parameters']['properties'].items():
+                    regexp += rf'"{parameter_name}": "{unversal_regexp_string}", '
+            else:
+                for parameter in method['required_parameters']:
+                    regexp += rf'"{parameter["name"]}": "{unversal_regexp_string}", '
+                for parameter in method['optional_parameters']:
+                    regexp += rf'"{parameter["name"]}": "{unversal_regexp_string}", '
+            regexp = regexp[:-2]
+            regexp += r'\n\}|'
+        regexp = regexp[:-1]
+        regexp += ')'
+        print(regexp)
+        return regexp
+
+    @property
+    def urls(self):
+        methods = self.functions['api_list']
+        return {m['name']: {'url': m['url'], 'method': m['method']} for m in methods if m['name'] != 'Finish'}
+
+
+    def check_success(self):
+        return self.success
+
+    def step(self,**args):
+        obs, code = self._step(**args)
+        if len(obs) > self.max_observation_length:
+            obs = obs[:self.max_observation_length] + "..."
+        return obs, code
+    
+    def _step(self, action_name="", action_input=""):
+        # print('>>>>>>>>>>>> \n', action_input, '>>>>>>>>>>>>\n')
+        action_input_json = json.loads(action_input)
+        return self._call_method(action_name, params=action_input_json)
+
+    def _call_method(self, method, params=None):
+        """
+        Calls a given method on the server with the provided parameters and returns the result.
+
+        Parameters:
+        method (str): The name of the method to call.
+        params (dict, optional): A dictionary of parameters to pass to the method.
+
+        Returns:
+        dict: The result of calling the method on the server.
+        """
+
+        if method == "Finish":
+            json_data = params
+            self.success = 1
+            return "{\"response\":\"successfully giving the final answer.\"}", 3 
+            if "return_type" not in json_data.keys():
+                return "{error:\"must have \"return_type\"\"}", 2
+            if json_data["return_type"] == "give_up_and_restart":
+                return "{\"response\":\"chose to give up and restart\"}",4
+            elif json_data["return_type"] == "give_answer":
+                if "final_answer" not in json_data.keys():
+                    return "{error:\"must have \"final_answer\"\"}", 2
+                
+                self.success = 1 # succesfully return final_answer
+                return "{\"response\":\"successfully giving the final answer.\"}", 3
+            else:
+                return "{error:\"\"return_type\" is not a valid choice\"}", 2
+
+
+        if params is None:
+            params = {}
+        url = self.urls[method]['url']
+        rt = self.urls[method]['method']
+        print('#'*30, '\n', f'method: {method}\n url:{url}\n type: {rt}\n params: {params}\n', '#'*30)
+        if rt == 'POST':
+            response = requests.post(f"{self.base_url}{url}", params=params)
+        else:
+            response = requests.get(f"{self.base_url}{url}", params=params)
+        if response.status_code != 200:
+            return {'error': f'error code: {response.status_code}'}, response.status_code
+        return response.json(), 200
+    
+    def to_json(self):
+        return {}
 
 class pipeline_runner:
     def __init__(self, args, add_retrieval=False, process_id=0, server=False):
@@ -503,10 +657,11 @@ class pipeline_runner:
         os.makedirs("/".join(splits[:-1]),exist_ok=True)
         os.makedirs("/".join(splits),exist_ok=True)
         output_file_path = os.path.join(output_dir_path,f"{query_id}_{method}.json")
-        if (not server) and os.path.exists(output_file_path):
-            return
+        # if (not server) and os.path.exists(output_file_path):
+        #     return
         [callback.on_tool_retrieval_start() for callback in callbacks]
-        env = rapidapi_wrapper(data_dict, tool_des, retriever, args, process_id=process_id)
+        # env = rapidapi_wrapper(data_dict, tool_des, retriever, args, process_id=process_id)
+        env = ApiInterface('http://127.0.0.1:5000', query_json=data_dict, args=args)
         [callback.on_tool_retrieval_end(
             tools=env.functions
         ) for callback in callbacks]
@@ -517,7 +672,7 @@ class pipeline_runner:
             user_input=query,
             method=method,
         ) for callback in callbacks]
-        chain,result = self.method_converter(
+        chain,result = self.method_converter( # this place is calling for the model inference
             backbone_model=backbone_model,
             openai_key=args.openai_key,
             method=method,
@@ -545,14 +700,15 @@ class pipeline_runner:
         random.seed(42)
         random.shuffle(task_list)
         print(f"total tasks: {len(task_list)}")
-        new_task_list = []
-        for task in task_list:
-            out_dir_path = task[-2]
-            query_id = task[2]
-            output_file_path = os.path.join(out_dir_path,f"{query_id}_{self.args.method}.json")
-            if not os.path.exists(output_file_path):
-                new_task_list.append(task)
-        task_list = new_task_list
+        # filter the tasks by novelty. only perform tasks without ready available answers
+        # new_task_list = []
+        # for task in task_list:
+        #     out_dir_path = task[-2]
+        #     query_id = task[2]
+        #     output_file_path = os.path.join(out_dir_path,f"{query_id}_{self.args.method}.json")
+        #     if not os.path.exists(output_file_path):
+        #         new_task_list.append(task)
+        # task_list = new_task_list
         print(f"undo tasks: {len(task_list)}")
         if self.add_retrieval:
             retriever = self.get_retriever()

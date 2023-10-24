@@ -56,7 +56,7 @@ def prepare_logits_processor(
 
 @torch.inference_mode()
 def generate_stream(
-    model, model2, tokenizer, params, device, context_len=8192, stream_interval=2, force_generate=False
+    model, model2, tokenizer, params, device, context_len=8192, stream_interval=2, force_generate=False, regexps=None
 ):
     prompt = params["prompt"]
     len_prompt = len(prompt)
@@ -209,9 +209,15 @@ def generate_stream(
     #     stopped = False
     # output = tokenizer.decode(output2).strip()
 
-    c3 = generate.regex(model2, r'Thought: \nAction: (ls_for_bash|Finish)\nAction Input: \{\n  "(addr|)": "(.+)\/([^\/]+)"\n\}', max_tokens=max_new_tokens)
+    # c3 = generate.regex(model2, r'Thought: \nAction: (ls_for_bash|Finish)\nAction Input: \{\n  "(addr|)": ".?"\n\}', max_tokens=max_new_tokens)
+    # breakpoint()
+    if regexps is None:
+        regexps = r'.*'
+    # c3 = generate.regex(model2, r'Thought: \nAction: (ls_for_bash\nAction Input: \{\n  "addr": ".*"|Finish\nAction Input: \{\n  "return_type": "(give_answer|give_up_and_restart)", "final_answer": ".*")\n\}', max_tokens=max_new_tokens)
+    c3 = generate.regex(model2, regexps, max_tokens=max_new_tokens)
     # breakpoint()
     output = c3(prompt)
+    # print('<'*30, '\n', output, '\n', '<'*30)
     output = re.sub(' +', ' ', output)
     # breakpoint()
     i = len(tokenizer.tokenize(output))

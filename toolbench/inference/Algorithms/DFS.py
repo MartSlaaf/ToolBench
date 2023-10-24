@@ -193,7 +193,7 @@ class DFS_tree_search(base_search_method):
                 messages=temp_now_node.messages
             ) for callback in self.callbacks]
             new_message, error_code, total_tokens = self.llm.parse(
-                self.io_func.functions, process_id=self.process_id)
+                self.io_func.functions, process_id=self.process_id, regexps=self.io_func.regexps)
             # on_llm_end
             [callback.on_llm_end(
                 depth=now_depth,
