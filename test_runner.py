@@ -47,13 +47,13 @@ import os
 
 def manage_tasks(name, git, questionnaire, model_addr, results_prefix, lora_addr=None, model_class='toolllama'):
     # Clone the repository
-    subprocess.run(f"cd ~/projects/repos; git clone {git} {name}", shell=True)
+    subprocess.run(f"mkdir repos; cd repos; git clone {git} {name}", shell=True)
 
     # Start the continuous task in a separate thread
     # continuous_task_thread = threading.Thread(target=run_command, args=(f'~/projects/ideformer-plugin/ide-former-plugin/runPluginStarter.sh ~/projects/repos/{name} 127.0.0.1 5000',))
     # continuous_task_thread.start()
 
-    task_manager = TaskManager(f'~/projects/ideformer-plugin/ide-former-plugin/runPluginStarter.sh ~/projects/repos/{name} 127.0.0.1 5000')
+    task_manager = TaskManager(f'sh ../ideformer-plugin/ide-former-plugin/runPluginStarter.sh "$PWD/repos/{name}" 127.0.0.1 5000')
     continuous_task_thread = threading.Thread(target=task_manager.run)
     continuous_task_thread.start()
 

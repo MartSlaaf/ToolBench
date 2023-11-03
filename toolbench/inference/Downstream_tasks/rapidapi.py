@@ -20,7 +20,6 @@ from toolbench.utils import (
     change_name,
     replace_llama_with_condense
 )
-from data import local_api
 
 from toolbench.inference.Downstream_tasks.base_env import base_env
 
