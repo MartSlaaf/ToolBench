@@ -1,0 +1,12 @@
+[{"name": "torch", 
+"git": "git@github.com:pytorch/pytorch.git", 
+"questionnaire": [{
+    "type": "count", 
+    "name": "none", 
+    "docstring": "none", 
+    "correct_answer": "", 
+    "question": "Which folders of my current project do containt python files?"}
+    , 
+    {"type": "def",
+    "name": "maybe_mark_dynamic",
+    "docstring": "Mark a tensor as having a dynamic dim, but don't enforce it (i.e., if this\n    dimension ends up getting specialized, don't error).", "file": "./repocloner/pytorch/torch/_dynamo/decorators.py", "question": "Which file contains a function that is used to mark a tensor dimension as dynamic?"}]}]

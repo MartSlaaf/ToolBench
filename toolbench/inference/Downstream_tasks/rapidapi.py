@@ -10,6 +10,7 @@ from toolbench.inference.LLM.chatgpt_function_model import ChatGPTFunction
 from toolbench.inference.LLM.davinci_model import Davinci
 from toolbench.inference.LLM.tool_llama_lora_model import ToolLLaMALoRA
 from toolbench.inference.LLM.tool_llama_model import ToolLLaMA
+from toolbench.inference.LLM.gpt4 import GPT4
 from toolbench.inference.LLM.retriever import ToolRetriever
 from toolbench.inference.Algorithms.single_chain import single_chain
 from toolbench.inference.Algorithms.DFS import DFS_tree_search
@@ -454,8 +455,7 @@ You have access of the following tools:\n'''
         """
         response = requests.get(f"{self.base_url}/ide-api-list")
         if response.status_code == 200:
-            methods = response.json()
-            methods = json.loads(methods['serverAnswer'])['APIs']
+            methods = json.loads(response.json())
 
             methods.append(finish_func)
                 
@@ -486,7 +486,7 @@ You have access of the following tools:\n'''
             regexp += r'\n\}|'
         regexp = regexp[:-1]
         regexp += ')'
-        print(regexp)
+        # print(regexp)
         return regexp
 
     @property
@@ -505,9 +505,11 @@ You have access of the following tools:\n'''
         return obs, code
     
     def _step(self, action_name="", action_input=""):
-        # print('>>>>>>>>>>>> \n', action_input, '>>>>>>>>>>>>\n')
-        action_input_json = json.loads(action_input)
-        return self._call_method(action_name, params=action_input_json)
+        try:
+            action_input_json = json.loads(action_input)
+            return self._call_method(action_name, params=action_input_json)
+        except Exception as e:
+            return {'exception': str(e)}, 500
 
     def _call_method(self, method, params=None):
         """
@@ -573,6 +575,8 @@ class pipeline_runner:
                 backbone_model = ToolLLaMA(model_name_or_path=args.model_path, lora_name_or_path=args.lora_path) #ToolLLaMALoRA(base_name_or_path=args.model_path, model_name_or_path=args.lora_path)
             else:
                 backbone_model = ToolLLaMA(model_name_or_path=args.model_path)
+        elif args.backbone_model == 'gpt4':
+            backbone_model = GPT4()
         else:
             backbone_model = args.backbone_model
         return backbone_model

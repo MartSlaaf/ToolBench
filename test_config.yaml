@@ -1,0 +1,4 @@
+model_class: toolllama
+model_addr: codellama/CodeLlama-7b-Instruct-hf
+lora_addr: /mnt/data/mart/toolcodellama_lora_constant/checkpoint-843
+results_prefix: codellama-lora
